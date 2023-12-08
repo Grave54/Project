@@ -4,19 +4,11 @@
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
 const int MOVEMENT_SPEED = 5;
-const int JUMP_FORCE = 15;
-const int GRAVITY = 1;
-const int MAX_JUMP_COUNT = 2;
 
-// Structure représentant le joueur
 typedef struct {
-    int x, y, w, h;         // Coordonnées et dimensions du joueur
-    int isJumping;          // Indique si le joueur est en train de sauter
-    int jumpCount;          // Nombre de sauts effectués
-    int yVelocity;          // Vitesse verticale du joueur
+    int x, y, w, h;
 } Player;
 
-// Fonction pour gérer les événements
 void handleEvents(SDL_Event *event, int *quit, Player *player) {
     while (SDL_PollEvent(event) != 0) {
         if (event->type == SDL_QUIT) {
@@ -25,7 +17,6 @@ void handleEvents(SDL_Event *event, int *quit, Player *player) {
     }
 }
 
-// Fonction pour mettre à jour la position du joueur
 void updatePlayer(Player *player, const Uint8 *currentKeyStates) {
     if (currentKeyStates[SDL_SCANCODE_RIGHT] && player->x < SCREEN_WIDTH - player->w) {
         player->x += MOVEMENT_SPEED;
@@ -33,41 +24,13 @@ void updatePlayer(Player *player, const Uint8 *currentKeyStates) {
     if (currentKeyStates[SDL_SCANCODE_LEFT] && player->x > 0) {
         player->x -= MOVEMENT_SPEED;
     }
-
-    if (player->isJumping) {
-        // Si le joueur est en train de sauter, ajuster la position en fonction de la vitesse verticale
-        player->y += player->yVelocity;
-        player->yVelocity += GRAVITY;
-
-        // Gérer les collisions avec le sol
-        if (player->y >= SCREEN_HEIGHT - player->h) {
-            player->y = SCREEN_HEIGHT - player->h;
-            player->isJumping = 0;
-            player->jumpCount = 0;
-        }
-    } else {
-        // Si le joueur n'est pas en train de sauter, appliquer la gravité
-        player->y += GRAVITY * 10;
-
-        // Gérer les collisions avec le sol
-        if (player->y >= SCREEN_HEIGHT - player->h) {
-            player->y = SCREEN_HEIGHT - player->h;
-        }
-
-        // Gérer le saut du joueur
-        if (currentKeyStates[SDL_SCANCODE_UP] && player->jumpCount < MAX_JUMP_COUNT) {
-            player->isJumping = 1;
-            player->yVelocity = -JUMP_FORCE;
-            player->jumpCount++;
-        }
-    }
 }
 
 int main(int argc, char *args[]) {
     SDL_Window *window = NULL;
     SDL_Renderer *renderer = NULL;
     SDL_Event event;
-    Player player = {SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 50, 50, 0, 0, 0};  // Initialisation du joueur
+    Player player = {SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 50, 50};
     int quit = 0;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
