@@ -3,48 +3,58 @@
 #include <SDL2/SDL_mixer.h>
 #include <stdio.h>
 
+// Définition des constantes pour la taille de l'écran
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
+
+// Paramètres du joueur
 const int MOVEMENT_SPEED = 5;
 const int JUMP_FORCE = 15;
 const int GRAVITY = 1;
 const int MAX_JUMP_COUNT = 2;
 
+// Structure représentant le joueur
 typedef struct {
-    int x, y, w, h;
-    int isJumping;
-    int jumpCount;
-    int yVelocity;
-    int score;
+    int x, y, w, h;         // Position et dimensions du joueur
+    int isJumping;          // Indique si le joueur est en train de sauter
+    int jumpCount;          // Nombre de sauts effectués
+    int yVelocity;          // Vitesse verticale du joueur
+    int score;              // Score du joueur (non utilisé dans cet exemple)
 } Player;
 
+// Structure représentant une plateforme
 typedef struct {
-    int x, y, w, h;
+    int x, y, w, h;         // Position et dimensions de la plateforme
 } Platform;
 
+// Structure représentant un obstacle
 typedef struct {
-    int x, y, w, h;
+    int x, y, w, h;         // Position et dimensions de l'obstacle
 } Obstacle;
 
+// Déclaration des sons
 Mix_Chunk* jumpSound;
-Mix_Chunk* scoreSound;
 Mix_Chunk* collisionSound;
 
+// Fonction pour réinitialiser les paramètres du joueur
 void resetPlayer(Player *player);
 
+// Fonction pour gérer les événements du jeu
 void handleEvents(SDL_Event *event, int *quit, Player *player) {
     while (SDL_PollEvent(event) != 0) {
         if (event->type == SDL_QUIT) {
-            *quit = 1;
+            *quit = 1;  // Quitte le jeu si la fenêtre est fermée
         } else if (event->type == SDL_KEYDOWN) {
             switch (event->key.keysym.scancode) {
                 case SDL_SCANCODE_UP:
+                    // Gestion du saut du joueur
                     if (player->jumpCount < MAX_JUMP_COUNT && !player->isJumping) {
                         player->isJumping = 1;
                         player->yVelocity = -JUMP_FORCE;
                         player->jumpCount++;
-                        Mix_PlayChannel(-1, jumpSound, 0); // Play jump sound
+                        Mix_PlayChannel(-1, jumpSound, 0); // Joue le son du saut
                     } else if (player->jumpCount < MAX_JUMP_COUNT && player->isJumping) {
+                        // Implémentation du double saut
                         player->yVelocity = -JUMP_FORCE;
                         player->jumpCount++;
                     }
@@ -56,69 +66,87 @@ void handleEvents(SDL_Event *event, int *quit, Player *player) {
     }
 }
 
+// Fonction pour mettre à jour la position du joueur et gérer les collisions
 void updatePlayer(Player *player, Platform platform, Platform secondPlatform, Obstacle obstacle1, Obstacle obstacle2) {
     if (player->isJumping) {
+        // Mise à jour de la position verticale lors d'un saut
         player->y += player->yVelocity;
         player->yVelocity += GRAVITY;
+
+        // Gestion des collisions avec le sol
         if (player->y >= SCREEN_HEIGHT - player->h) {
             player->y = SCREEN_HEIGHT - player->h;
             player->isJumping = 0;
             player->jumpCount = 0;
         }
+
+        // Gestion des collisions avec la première plateforme
         if (player->y + player->h >= platform.y && player->y + player->h <= platform.y + platform.h
             && player->x + player->w >= platform.x && player->x <= platform.x + platform.w) {
             player->isJumping = 0;
             player->jumpCount = 0;
             player->y = platform.y - player->h;
-        } else if (player->y + player->h >= secondPlatform.y && player->y + player->h <= secondPlatform.y + secondPlatform.h
+        }
+
+        // Gestion des collisions avec la deuxième plateforme
+        else if (player->y + player->h >= secondPlatform.y && player->y + player->h <= secondPlatform.y + secondPlatform.h
             && player->x + player->w >= secondPlatform.x && player->x <= secondPlatform.x + secondPlatform.w) {
             player->isJumping = 0;
             player->jumpCount = 0;
             player->y = secondPlatform.y - player->h;
         }
-        // Check collision with obstacles
+
+        // Vérification des collisions avec les obstacles
         if (player->x < obstacle1.x + obstacle1.w && player->x + player->w > obstacle1.x &&
             player->y < obstacle1.y + obstacle1.h && player->y + player->h > obstacle1.y) {
-            Mix_PlayChannel(-1, collisionSound, 0); // Play collision sound
+            Mix_PlayChannel(-1, collisionSound, 0); // Joue le son de la collision
             resetPlayer(player);
         }
 
         if (player->x < obstacle2.x + obstacle2.w && player->x + player->w > obstacle2.x &&
             player->y < obstacle2.y + obstacle2.h && player->y + player->h > obstacle2.y) {
-            Mix_PlayChannel(-1, collisionSound, 0); // Play collision sound
+            Mix_PlayChannel(-1, collisionSound, 0); // Joue le son de la collision
             resetPlayer(player);
         }
     } else {
+        // Appliquer la gravité lors du déplacement latéral
         player->y += GRAVITY * 10;
 
+        // Gestion des collisions avec la première plateforme
         if (player->y + player->h >= platform.y && player->y + player->h <= platform.y + platform.h
             && player->x + player->w >= platform.x && player->x <= platform.x + platform.w) {
             player->y = platform.y - player->h;
-        } else if (player->y + player->h >= secondPlatform.y && player->y + player->h <= secondPlatform.y + secondPlatform.h
+        }
+
+        // Gestion des collisions avec la deuxième plateforme
+        else if (player->y + player->h >= secondPlatform.y && player->y + player->h <= secondPlatform.y + secondPlatform.h
             && player->x + player->w >= secondPlatform.x && player->x <= secondPlatform.x + secondPlatform.w) {
             player->isJumping = 0;
             player->jumpCount = 0;
             player->y = secondPlatform.y - player->h;
         }
 
+        // Gestion des collisions avec la limite inférieure de l'écran
         if (player->y >= SCREEN_HEIGHT - player->h) {
             player->y = SCREEN_HEIGHT - player->h;
         }
-        // Check collision with obstacles
+
+        // Vérification des collisions avec les obstacles
         if (player->x < obstacle1.x + obstacle1.w && player->x + player->w > obstacle1.x &&
             player->y < obstacle1.y + obstacle1.h && player->y + player->h > obstacle1.y) {
-            Mix_PlayChannel(-1, collisionSound, 0); // Play collision sound
+            Mix_PlayChannel(-1, collisionSound, 0); // Joue le son de la collision
             resetPlayer(player);
         }
 
         if (player->x < obstacle2.x + obstacle2.w && player->x + player->w > obstacle2.x &&
             player->y < obstacle2.y + obstacle2.h && player->y + player->h > obstacle2.y) {
-            Mix_PlayChannel(-1, collisionSound, 0); // Play collision sound
+            Mix_PlayChannel(-1, collisionSound, 0); // Joue le son de la collision
             resetPlayer(player);
         }
     }
 }
 
+// Fonction pour réinitialiser les paramètres du joueur
 void resetPlayer(Player *player) {
     player->x = 0;
     player->y = SCREEN_HEIGHT - 65;
@@ -131,7 +159,7 @@ int main(int argc, char* args[]) {
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
     SDL_Event event;
-    Player player = { 0, SCREEN_HEIGHT - 65, 35, 65, 0, 0, 0, 0 }; // Modify x, y, w, and h values accordingly
+    Player player = { 0, SCREEN_HEIGHT - 65, 35, 65, 0, 0, 0, 0 }; // Modifier les valeurs x, y, w, et h en conséquence
     Platform platform = { 200, 400, 400, 20 };
     Platform secondPlatform = { 500, 300, 300, 20 };
     Obstacle obstacle1 = { 400, 300, 50, 50 };
@@ -166,7 +194,6 @@ int main(int argc, char* args[]) {
     }
 
     jumpSound = Mix_LoadWAV("jump.wav");
-    scoreSound = Mix_LoadWAV("score.wav");
     collisionSound = Mix_LoadWAV("collision.wav");
 
     const int SCREEN_TICKS_PER_FRAME = 1000 / 60;
@@ -212,7 +239,6 @@ int main(int argc, char* args[]) {
     }
 
     Mix_FreeChunk(jumpSound);
-    Mix_FreeChunk(scoreSound);
     Mix_FreeChunk(collisionSound);
 
     SDL_DestroyRenderer(renderer);
