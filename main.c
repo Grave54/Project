@@ -190,15 +190,6 @@ void updatePlayer(Player *player, Platform platform, Platform secondPlatform, Ob
     }
 }
 
-// Fonction pour réinitialiser la position du joueur
-void resetPlayer(Player *player) {
-    player->x = 0;
-    player->y = SCREEN_HEIGHT - 65;
-    player->isJumping = 0;
-    player->jumpCount = 0;
-    player->yVelocity = 0;
-}
-
 // Fonction pour vérifier la collision entre deux rectangles
 int checkCollision(SDL_Rect a, SDL_Rect b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -214,12 +205,12 @@ void resetPlayer(Player *player) {
 }
 
 // Fonction principale du programme
-int main(int argc, char* args[]) {
+int main(void) {
     // Initialisation des éléments SDL
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
     SDL_Event event;
-    Player player = { 0, SCREEN_HEIGHT - 65, 35, 65, 0, 0, 0, 0 }; // Modifier les valeurs de x, y, w et h selon les besoins
+    Player player = { 0, SCREEN_HEIGHT - 65, 35, 65, 0, 0, 0, 0 ,0}; // Modifier les valeurs de x, y, w et h selon les besoins
     Platform platform = { 200, 400, 400, 20 };
     Platform secondPlatform = { 500, 300, 300, 20 };
     Obstacle obstacle1 = { 400, 300, 50, 50 };
@@ -314,7 +305,7 @@ int main(int argc, char* args[]) {
         if (font == NULL) {
             printf("Failed to load font! SDL_ttf Error: %s\n", TTF_GetError());
         } else {
-            SDL_Color textColor = {0, 0, 0}; 
+            SDL_Color textColor = {0, 0, 0,0}; 
             char scoreText[50];
             sprintf(scoreText, "Score: %d", player.score);
             SDL_Surface* scoreSurface = TTF_RenderText_Solid(font, scoreText, textColor);
