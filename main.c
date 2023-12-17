@@ -17,7 +17,7 @@
 	    int jumpCount;
 	    int yVelocity;
 	    int isDucking;
-	    int score;
+	    int level; 	
 	} Player;
 
 	typedef struct {
@@ -36,9 +36,84 @@
 	    SDL_Rect buttonRect;
 	    int isVisible;
 	} Menu;
+	
+	// Déclarer la nouvelle structure pour stocker les données de l'obstacle à partir du fichier texte
+	typedef struct {
+	    int x, y, w, h;
+	} ObstacleFromFile;
 
+    // Déclarer la nouvelle structure pour stocker les données de l'obstacle à partir du fichier texte
+	typedef struct {
+	    int x, y, w, h;
+	} PlatformFromFile;
+
+
+	// Prototyper la nouvelle fonction
+	ObstacleFromFile* readObstaclesFromFile(const char* filename, int* obstacleCount) {
+	    FILE* file = fopen(filename, "r");
+	    if (file == NULL) {
+		fprintf(stderr, "Unable to open file: %s\n", filename);
+		exit(EXIT_FAILURE);
+	    }
+
+	    fscanf(file, "%d", obstacleCount);
+
+	    // Allouer de la mémoire pour stocker les obstacles
+	    ObstacleFromFile* obstacles = (ObstacleFromFile*)malloc(*obstacleCount * sizeof(ObstacleFromFile));
+
+	    // Lire les données des obstacles à partir du fichier
+	    for (int i = 0; i < *obstacleCount; ++i) {
+		fscanf(file, "%d %d %d %d", &obstacles[i].x, &obstacles[i].y, &obstacles[i].w, &obstacles[i].h);
+	    }
+
+	    fclose(file);
+
+	    return obstacles;
+
+	}
+
+    PlatformFromFile* readPlatformsFromFile(const char* filename, int* platformCount) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Unable to open file: %s\n", filename);
+        exit(EXIT_FAILURE);
+    }
+
+    fscanf(file, "%d", platformCount);
+
+    // Allouer de la mémoire pour stocker les plateformes
+    PlatformFromFile* platforms = (PlatformFromFile*)malloc(*platformCount * sizeof(PlatformFromFile));
+
+    // Lire les données des plateformes à partir du fichier
+    for (int i = 0; i < *platformCount; ++i) {
+        fscanf(file, "%d %d %d %d", &platforms[i].x, &platforms[i].y, &platforms[i].w, &platforms[i].h);
+    }
+
+    fclose(file);
+
+    return platforms;
+}
+
+	
+	void drawObstacles(SDL_Renderer* renderer, ObstacleFromFile* obstacles, int obstacleCount) {
+	    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 0);  // Couleur bleu
+	    for (int i = 0; i < obstacleCount; ++i) {
+		SDL_Rect obstacleRect = { obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h };
+		SDL_RenderFillRect(renderer, &obstacleRect);
+	    }
+	}
+
+    void drawPlatforms(SDL_Renderer* renderer, PlatformFromFile* platforms, int platformCount) {
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Couleur verte pour les plateformes
+    for (int i = 0; i < platformCount; ++i) {
+        SDL_Rect platformRect = { platforms[i].x, platforms[i].y, platforms[i].w, platforms[i].h };
+        SDL_RenderFillRect(renderer, &platformRect);
+    }
+}
+
+	
 	Mix_Chunk* jumpSound;
-	Mix_Chunk* scoreSound;
+	Mix_Chunk* levelSound;
 	Mix_Chunk* collisionSound;
 
 	void resetPlayer(Player *player);
@@ -98,107 +173,84 @@
 
 
 
-	void updatePlayer(Player *player, Platform platform, Platform secondPlatform, Obstacle obstacle1, Obstacle obstacle2, ExitDoor exitDoor) {
-	    if (player->isDucking) {
-		player->h = 30;
-	    } else {
-		// Rétablir la taille du joueur à la valeur normale
-		if (player->isJumping) {
-		    player->h = 65;
-		} else {
-		    // Si le joueur ne saute pas, ajuster la position en fonction de la nouvelle hauteur
-		    int previousHeight = player->h;
-		    player->h = 65;
-		    player->y -= (player->h - previousHeight);
-		}
-	    }
-	    if (player->isJumping) { // Si le joueur saute
-		player->y += player->yVelocity;
-		player->yVelocity += GRAVITY;
+void updatePlayer(Player *player, PlatformFromFile* platforms, int platformCount, ExitDoor exitDoor, ObstacleFromFile* obstacles, int obstacleCount) {
+    // Gérer la hauteur du joueur en fonction de son état (debout, accroupi, sautant)
+    if (player->isDucking) {
+        player->h = 30;
+    } else {
+        // Rétablir la taille du joueur à la valeur normale
+        if (player->isJumping) {
+            player->h = 65;
+        } else {
+            // Si le joueur ne saute pas, ajuster la position en fonction de la nouvelle hauteur
+            int previousHeight = player->h;
+            player->h = 65;
+            player->y -= (player->h - previousHeight);
+        }
+    }
 
-		if (player->y >= SCREEN_HEIGHT - player->h) { // Si le joueur touche la bordure de l'écran
-		    player->y = SCREEN_HEIGHT - player->h;
-		    player->isJumping = 0;
-		    player->jumpCount = 0;
-		}
+    // Mettre à jour la position du joueur en fonction de son état (sautant ou non)
+    if (player->isJumping) { // Si le joueur saute
+        player->y += player->yVelocity;
+        player->yVelocity += GRAVITY;
 
-		if (player->y + player->h >= platform.y && player->y + player->h <= platform.y + platform.h
-		    && player->x + player->w >= platform.x && player->x <= platform.x + platform.w) {
-		    player->isJumping = 0;
-		    player->jumpCount = 0;
-		    player->y = platform.y - player->h;
-		} else if (player->y + player->h >= secondPlatform.y && player->y + player->h <= secondPlatform.y + secondPlatform.h
-		    && player->x + player->w >= secondPlatform.x && player->x <= secondPlatform.x + secondPlatform.w) {
-		    player->isJumping = 0;
-		    player->jumpCount = 0;
-		    player->y = secondPlatform.y - player->h;
-		}
+        // Gérer les collisions avec le sol
+        if (player->y >= SCREEN_HEIGHT - player->h) {
+            player->y = SCREEN_HEIGHT - player->h;
+            player->isJumping = 0;
+            player->jumpCount = 0;
+        }
 
-		if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h}, (SDL_Rect){obstacle1.x, obstacle1.y, obstacle1.w, obstacle1.h})) {
-		    Mix_PlayChannel(-1, collisionSound, 0);
-		    resetPlayer(player);
-		    player->score = 0;
-		}
+        // Vérifier la collision avec la porte de sortie
+        if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h},
+                           (SDL_Rect){exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h})) {
+            SDL_Delay(2000);
+            resetPlayer(player);
+            player->level++;
+        }
 
-		if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h}, (SDL_Rect){obstacle2.x, obstacle2.y, obstacle2.w, obstacle2.h})) {
-		    Mix_PlayChannel(-1, collisionSound, 0);
-		    resetPlayer(player);
-		    player->score = 0;
-		}
+        // Si le joueur n'est plus en train de sauter, réinitialiser le nombre de sauts effectués
+        if (!player->isJumping) {
+            player->jumpCount = 0;
+        }
+    } else {
+        // Si le joueur ne saute pas, appliquer la gravité
+        player->y += GRAVITY * 10;
 
-		if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h}, (SDL_Rect){exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h})) {
-		    printf("Congratulations! You passed the level!\n");
-		    SDL_Delay(2000);
-		    resetPlayer(player);
-		    player->score++;
-		}
+        // Gérer les collisions avec le sol
+        if (player->y >= SCREEN_HEIGHT - player->h) {
+            player->y = SCREEN_HEIGHT - player->h;
+        }
 
-		// Si le joueur n'est plus en train de sauter, réinitialiser le nombre de sauts effectués
-		if (!player->isJumping) {
-		    player->jumpCount = 0;
-		}
+        // Vérifier la collision avec la porte de sortie
+        if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h},
+                           (SDL_Rect){exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h})) {
+            SDL_Delay(2000);
+            resetPlayer(player);
+            player->level++;
+        }
+    }
 
-	    } else {
-		player->y += GRAVITY * 10;
+    // Vérifier les collisions avec les obstacles
+    for (int i = 0; i < obstacleCount; ++i) {
+        if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h},
+                           (SDL_Rect){obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h})) {
+            Mix_PlayChannel(-1, collisionSound, 0);
+            resetPlayer(player);
+            player->level = 1;
+        }
+    }
 
-		if (player->y + player->h >= platform.y && player->y + player->h <= platform.y + platform.h
-		    && player->x + player->w >= platform.x && player->x <= platform.x + platform.w) {
-		    player->y = platform.y - player->h;
-		} else if (player->y + player->h >= secondPlatform.y && player->y + player->h <= secondPlatform.y + secondPlatform.h
-		    && player->x + player->w >= secondPlatform.x && player->x <= secondPlatform.x + secondPlatform.w) {
-		    player->isJumping = 0;
-		    player->jumpCount = 0;
-		    player->y = secondPlatform.y - player->h;
-		}
-
-		if (player->y >= SCREEN_HEIGHT - player->h) {
-		    player->y = SCREEN_HEIGHT - player->h;
-		}
-		if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h}, (SDL_Rect){obstacle1.x, obstacle1.y, obstacle1.w, obstacle1.h})) {
-		    Mix_PlayChannel(-1, collisionSound, 0);
-		    resetPlayer(player);
-		    player->score = 0;
-		}
-
-		if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h}, (SDL_Rect){obstacle2.x, obstacle2.y, obstacle2.w, obstacle2.h})) {
-		    Mix_PlayChannel(-1, collisionSound, 0);
-		    resetPlayer(player);
-		    player->score = 0;
-		}
-
-		if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h}, (SDL_Rect){exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h})) {
-		    printf("Congratulations! You passed the level!\n");
-		    SDL_Delay(2000);
-		    resetPlayer(player);
-		    player->score++;
-		}
-
-		if (checkCollision((SDL_Rect){player->x, player->y + 1, player->w, player->h}, (SDL_Rect){platform.x, platform.y, platform.w, platform.h}) ||
-		    checkCollision((SDL_Rect){player->x, player->y + 1, player->w, player->h}, (SDL_Rect){secondPlatform.x, secondPlatform.y, secondPlatform.w, secondPlatform.h})) {
-		    player->jumpCount = 0;
-		}
-	    }
-	}
+    // Vérifier la collision avec les plateformes lues à partir du fichier
+    for (int i = 0; i < platformCount; ++i) {
+        if (checkCollision((SDL_Rect){player->x, player->y, player->w, player->h},
+                           (SDL_Rect){platforms[i].x, platforms[i].y, platforms[i].w, platforms[i].h})) {
+            player->isJumping = 0;
+            player->jumpCount = 0;
+            player->y = platforms[i].y - player->h;
+        }
+    }
+}
 
 	int checkCollision(SDL_Rect a, SDL_Rect b) {
 	    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -219,14 +271,17 @@
 	    SDL_Window* window = NULL;
 	    SDL_Renderer* renderer = NULL;
 	    SDL_Event event;
-	    Player player = { 0, SCREEN_HEIGHT - 65, 35, 65, 0, 0, 0, 0, 0 };
-	    Platform platform = { 200, 400, 400, 20 };
-	    Platform secondPlatform = { 500, 300, 300, 20 };
-	    Obstacle obstacle1 = { 400, 300, 50, 50 };
-	    Obstacle obstacle2 = { 600, 450, 50, 50 };
+	    Player player = { 0, SCREEN_HEIGHT - 65, 35, 65, 0, 0, 0, 0, 1 };
 	    ExitDoor exitDoor = { 700, 200, 50, 100 };
 	    Menu menu = { { SCREEN_WIDTH - 100, 0, 100, 50 }, 0 };
+	    
+	    // Charger les obstacles à partir du fichier
+	    int obstacleCount;
+	    ObstacleFromFile* obstacles = readObstaclesFromFile("obstacles1.txt", &obstacleCount);
 
+            // Charger les plateformes à partir du fichier
+            int platformCount;
+            PlatformFromFile* platforms = readPlatformsFromFile("platforms1.txt", &platformCount);
 
 	    int quit = 0;
 
@@ -265,7 +320,7 @@
 	    }
 
 	    jumpSound = Mix_LoadWAV("jump.wav");
-	    scoreSound = Mix_LoadWAV("score.wav");
+	    levelSound = Mix_LoadWAV("level.wav");
 	    collisionSound = Mix_LoadWAV("collision.wav");
 
 	    const int SCREEN_TICKS_PER_FRAME = 1000 / 60;
@@ -285,22 +340,18 @@
 		    player.x -= MOVEMENT_SPEED;
 		}}
 
-		updatePlayer(&player, platform, secondPlatform, obstacle1, obstacle2, exitDoor);
+		updatePlayer(&player, platforms, platformCount, exitDoor, obstacles, obstacleCount);
 
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 		SDL_RenderClear(renderer);
 
-		SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-		SDL_Rect platformRect = { platform.x, platform.y, platform.w, platform.h };
-		SDL_Rect secondPlatformRect = { secondPlatform.x, secondPlatform.y, secondPlatform.w, secondPlatform.h };
-		SDL_RenderFillRect(renderer, &platformRect);
-		SDL_RenderFillRect(renderer, &secondPlatformRect);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);				
+		
+		drawObstacles(renderer, obstacles, obstacleCount);
 
-		SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);			
-		SDL_Rect obstacleRect1 = { obstacle1.x, obstacle1.y, obstacle1.w, obstacle1.h };
-		SDL_Rect obstacleRect2 = { obstacle2.x, obstacle2.y, obstacle2.w, obstacle2.h };
-		SDL_RenderFillRect(renderer, &obstacleRect1);
-		SDL_RenderFillRect(renderer, &obstacleRect2);
+
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+       drawPlatforms(renderer, platforms, platformCount);
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 		SDL_Rect exitDoorRect = { exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h };
@@ -369,21 +420,21 @@
 		}
 
 
-		// Afficher le score a lecran
+		// Afficher le level a lecran
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		TTF_Font* font = TTF_OpenFont("arial.ttf", 72);
 		if (font == NULL) {
 		    printf("Failed to load font! SDL_ttf Error: %s\n", TTF_GetError());
 		} else {
 		    SDL_Color textColor = { 0, 0, 0, 0 };
-		    char scoreText[50];
-		    sprintf(scoreText, "Score: %d", player.score);
-		    SDL_Surface* scoreSurface = TTF_RenderText_Solid(font, scoreText, textColor);
-		    SDL_Texture* scoreTexture = SDL_CreateTextureFromSurface(renderer, scoreSurface);
-		    SDL_Rect scoreRect = { 10, 10, scoreSurface->w, scoreSurface->h };
-		    SDL_RenderCopy(renderer, scoreTexture, NULL, &scoreRect);
-		    SDL_FreeSurface(scoreSurface);
-		    SDL_DestroyTexture(scoreTexture);
+		    char levelText[50];
+		    sprintf(levelText, "Score: %d", player.level);
+		    SDL_Surface* levelSurface = TTF_RenderText_Solid(font, levelText, textColor);
+		    SDL_Texture* levelTexture = SDL_CreateTextureFromSurface(renderer, levelSurface);
+		    SDL_Rect levelRect = { 10, 10, levelSurface->w, levelSurface->h };
+		    SDL_RenderCopy(renderer, levelTexture, NULL, &levelRect);
+		    SDL_FreeSurface(levelSurface);
+		    SDL_DestroyTexture(levelTexture);
 		    TTF_CloseFont(font);
 		}
 		
@@ -418,8 +469,9 @@
 	    }
 
 	    // Libérer les ressources
+	    free(obstacles);
 	    Mix_FreeChunk(jumpSound);
-	    Mix_FreeChunk(scoreSound);
+	    Mix_FreeChunk(levelSound);
 	    Mix_FreeChunk(collisionSound);
 	    TTF_CloseFont(continueButtonFont);
 	    SDL_DestroyRenderer(renderer);
@@ -429,4 +481,3 @@
 	    SDL_Quit();
 	    return 0;
 	}
-
